@@ -163,33 +163,56 @@ function renderHome() {
   const entries = getEntries();
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-
   const monthEntries = entries.filter(e => e.month === currentMonth);
   const currency = getCurrency();
+  const settings = getSettings();
 
-  const income = monthEntries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
+  const income   = monthEntries.filter(e => e.type === 'credit').reduce((s, e) => s + e.amount, 0);
   const expenses = monthEntries.filter(e => e.type === 'debit').reduce((s, e) => s + e.amount, 0);
-  const balance = income - expenses;
+  const balance  = income - expenses;
 
-  // Balance
+  // Greeting + name
+  const hour = now.getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  document.getElementById('home-greeting').textContent = greeting;
+  document.getElementById('home-name').textContent = settings.name ? `Hi, ${settings.name} 👋` : 'My Finances';
+
+  // Balance hero
   const balEl = document.getElementById('home-balance');
-  balEl.textContent = currency + formatAmount(Math.abs(balance));
-  balEl.className = 'header-balance ' + (balance >= 0 ? 'positive' : 'negative');
-  if (balance < 0) balEl.textContent = '-' + currency + formatAmount(Math.abs(balance));
+  balEl.textContent = (balance < 0 ? '-' : '') + currency + formatAmount(Math.abs(balance));
+  balEl.className = 'balance-amount ' + (balance >= 0 ? 'positive' : 'negative');
 
-  document.getElementById('home-income').textContent = currency + formatAmount(income);
+  const subEl = document.getElementById('home-balance-sub');
+  if (income === 0 && expenses === 0) {
+    subEl.textContent = 'No transactions yet this month';
+  } else if (balance >= 0) {
+    subEl.textContent = `You're ${currency}${formatAmount(balance)} ahead this month`;
+  } else {
+    subEl.textContent = `Overspent by ${currency}${formatAmount(Math.abs(balance))} this month`;
+  }
+
+  document.getElementById('home-income').textContent   = currency + formatAmount(income);
   document.getElementById('home-expenses').textContent = currency + formatAmount(expenses);
+  document.getElementById('home-month').textContent    = formatMonthLabel(currentMonth);
 
-  // Month label
-  document.getElementById('home-month').textContent = formatMonthLabel(currentMonth);
+  // Budget progress bar
+  const budgetWrap = document.getElementById('budget-bar-wrap');
+  if (settings.budget && settings.budget > 0) {
+    budgetWrap.classList.add('visible');
+    const pct = Math.min(Math.round((expenses / settings.budget) * 100), 100);
+    document.getElementById('budget-bar-label').textContent = `${pct}% of ${currency}${formatAmount(settings.budget)}`;
+    const fill = document.getElementById('budget-bar-fill');
+    fill.style.width = pct + '%';
+    fill.className = 'budget-bar-fill' + (pct >= 100 ? ' danger' : pct >= 80 ? ' warning' : '');
+  } else {
+    budgetWrap.classList.remove('visible');
+  }
 
   // Nudges
-  const nudges = generateNudges(entries, currentMonth);
-  renderNudges(nudges);
+  renderNudges(generateNudges(entries, currentMonth));
 
-  // Recent transactions (last 5)
-  const recent = entries.slice(0, 5);
-  renderTransactionList('recent-list', recent, true);
+  // Recent (last 5)
+  renderTransactionList('recent-list', entries.slice(0, 5), true);
 }
 
 function renderNudges(nudges) {
@@ -597,15 +620,18 @@ function openSettings() {
   document.getElementById('setting-worker-url').value = settings.workerUrl || '';
   document.getElementById('setting-api-key').value = settings.apiKey || '';
 
-  // Show backend connection status
-  const dot = document.getElementById('backend-dot');
+  // Show backend connection status pill
+  const pill = document.getElementById('backend-status-pill');
+  const dot  = document.getElementById('backend-dot');
   const statusText = document.getElementById('backend-status-text');
   if (settings.workerUrl && settings.apiKey) {
-    dot.className = 'backend-dot connected';
-    statusText.textContent = 'Background sync active — SMS auto-saved silently';
+    pill.className = 'backend-pill active';
+    dot.classList.add('pulse');
+    statusText.textContent = 'Active';
   } else {
-    dot.className = 'backend-dot';
-    statusText.textContent = 'Not configured — set Worker URL + API key below';
+    pill.className = 'backend-pill inactive';
+    dot.classList.remove('pulse');
+    statusText.textContent = 'Off';
   }
 
   // Build Shortcut SMS URL using worker URL
