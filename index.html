@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Expenses" />
+  <meta name="theme-color" content="#6366f1" />
+  <title>Expense Tracker</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="icons/icon-192.svg" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN: HOME / DASHBOARD
+  ═══════════════════════════════════════════════════ -->
+  <div id="screen-home" class="screen active">
+    <div class="status-bar-spacer"></div>
+    <header class="app-header">
+      <div>
+        <div class="header-label">Total Balance</div>
+        <div class="header-balance" id="home-balance">₹0</div>
+        <div class="header-month" id="home-month"></div>
+      </div>
+      <button class="icon-btn" id="home-settings-btn" aria-label="Settings">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </header>
+
+    <!-- Income vs Expense summary cards -->
+    <div class="summary-cards">
+      <div class="summary-card income-card">
+        <div class="summary-icon">↑</div>
+        <div>
+          <div class="summary-label">Income</div>
+          <div class="summary-amount" id="home-income">₹0</div>
+        </div>
+      </div>
+      <div class="summary-card expense-card">
+        <div class="summary-icon">↓</div>
+        <div>
+          <div class="summary-label">Expenses</div>
+          <div class="summary-amount" id="home-expenses">₹0</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Nudges / Smart Alerts -->
+    <div class="section-header">
+      <span class="section-title">Smart Nudges</span>
+      <span class="section-badge" id="nudge-count">0</span>
+    </div>
+    <div id="nudges-container" class="nudges-list">
+      <div class="empty-nudges">No nudges yet — add some transactions to get insights.</div>
+    </div>
+
+    <!-- Recent Transactions -->
+    <div class="section-header">
+      <span class="section-title">Recent</span>
+      <button class="text-btn" onclick="navigate('history')">See all</button>
+    </div>
+    <div id="recent-list" class="transaction-list">
+      <div class="empty-state">
+        <div class="empty-icon">💸</div>
+        <div class="empty-title">No transactions yet</div>
+        <div class="empty-sub">Tap + to add your first entry or paste a bank SMS</div>
+      </div>
+    </div>
+
+    <div class="bottom-spacer"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN: ADD ENTRY
+  ═══════════════════════════════════════════════════ -->
+  <div id="screen-add" class="screen">
+    <div class="status-bar-spacer"></div>
+    <header class="page-header">
+      <button class="back-btn" onclick="navigate('home')">‹ Back</button>
+      <h1 class="page-title">Add Entry</h1>
+      <div style="width:60px"></div>
+    </header>
+
+    <!-- SMS Paste Section -->
+    <div class="card sms-card">
+      <div class="sms-card-header">
+        <span class="sms-icon">📱</span>
+        <div>
+          <div class="sms-title">Paste Bank SMS</div>
+          <div class="sms-sub">Copy an SMS from your bank → paste below → auto-parsed</div>
+        </div>
+      </div>
+      <textarea id="sms-input" class="sms-textarea" placeholder="Paste your bank SMS here...&#10;&#10;e.g. INR 850.00 debited from A/c XX1234 on 13-04-26 at Zomato"></textarea>
+      <div id="sms-parse-result" class="sms-result hidden"></div>
+      <button class="btn btn-secondary" id="parse-sms-btn">Parse SMS</button>
+    </div>
+
+    <div class="divider-text">— or enter manually —</div>
+
+    <!-- Manual Entry Form -->
+    <form id="entry-form" class="card form-card">
+      <!-- Type Toggle -->
+      <div class="type-toggle">
+        <button type="button" class="toggle-btn active" id="btn-debit" onclick="setEntryType('debit')">Debit (Expense)</button>
+        <button type="button" class="toggle-btn" id="btn-credit" onclick="setEntryType('credit')">Credit (Income)</button>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Amount (₹)</label>
+        <input type="number" id="field-amount" class="form-input" placeholder="0.00" inputmode="decimal" required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Description / Merchant</label>
+        <input type="text" id="field-merchant" class="form-input" placeholder="e.g. Zomato, Salary, Amazon" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Category</label>
+        <div class="category-row">
+          <select id="field-category" class="form-input form-select">
+            <option value="Food">🍔 Food</option>
+            <option value="Transport">🚗 Transport</option>
+            <option value="Shopping">🛍️ Shopping</option>
+            <option value="Housing">🏠 Housing</option>
+            <option value="Entertainment">🎬 Entertainment</option>
+            <option value="Health">💊 Health</option>
+            <option value="Groceries">🛒 Groceries</option>
+            <option value="Income">💰 Income</option>
+            <option value="Education">📚 Education</option>
+            <option value="Utilities">⚡ Utilities</option>
+            <option value="Investment">📈 Investment</option>
+            <option value="Uncategorized">❓ Uncategorized</option>
+          </select>
+          <span class="auto-tag hidden" id="auto-category-tag">Auto</span>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Bank / Account</label>
+        <select id="field-bank" class="form-input form-select">
+          <option value="">Select bank</option>
+          <option value="HDFC">HDFC Bank</option>
+          <option value="SBI">SBI</option>
+          <option value="ICICI">ICICI Bank</option>
+          <option value="Axis">Axis Bank</option>
+          <option value="Kotak">Kotak Bank</option>
+          <option value="IDFC">IDFC First</option>
+          <option value="Yes">Yes Bank</option>
+          <option value="PNB">PNB</option>
+          <option value="BOB">Bank of Baroda</option>
+          <option value="Cash">Cash</option>
+          <option value="Paytm">Paytm</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Date</label>
+        <input type="date" id="field-date" class="form-input" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Note (optional)</label>
+        <input type="text" id="field-note" class="form-input" placeholder="Any additional notes" />
+      </div>
+
+      <button type="submit" class="btn btn-primary">Save Entry</button>
+    </form>
+
+    <div class="bottom-spacer"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN: HISTORY
+  ═══════════════════════════════════════════════════ -->
+  <div id="screen-history" class="screen">
+    <div class="status-bar-spacer"></div>
+    <header class="page-header">
+      <h1 class="page-title">History</h1>
+      <button class="icon-btn" id="export-btn" aria-label="Export">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      </button>
+    </header>
+
+    <!-- Filters -->
+    <div class="filter-bar">
+      <select id="filter-month" class="filter-select"></select>
+      <select id="filter-category" class="filter-select">
+        <option value="">All Categories</option>
+        <option value="Food">Food</option>
+        <option value="Transport">Transport</option>
+        <option value="Shopping">Shopping</option>
+        <option value="Housing">Housing</option>
+        <option value="Entertainment">Entertainment</option>
+        <option value="Health">Health</option>
+        <option value="Groceries">Groceries</option>
+        <option value="Income">Income</option>
+        <option value="Education">Education</option>
+        <option value="Utilities">Utilities</option>
+        <option value="Investment">Investment</option>
+        <option value="Uncategorized">Uncategorized</option>
+      </select>
+      <select id="filter-bank" class="filter-select">
+        <option value="">All Banks</option>
+      </select>
+    </div>
+
+    <div class="search-bar">
+      <input type="text" id="search-input" class="search-input" placeholder="🔍  Search transactions..." />
+    </div>
+
+    <!-- Month summary -->
+    <div class="month-summary" id="history-summary"></div>
+
+    <!-- Transaction list -->
+    <div id="history-list" class="transaction-list"></div>
+
+    <div class="bottom-spacer"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN: INSIGHTS
+  ═══════════════════════════════════════════════════ -->
+  <div id="screen-insights" class="screen">
+    <div class="status-bar-spacer"></div>
+    <header class="page-header">
+      <h1 class="page-title">Insights</h1>
+      <select id="insights-month" class="filter-select"></select>
+    </header>
+
+    <!-- Charts -->
+    <div class="card chart-card">
+      <div class="chart-title">Income vs Expenses (6 months)</div>
+      <canvas id="chart-monthly" height="200"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-title">Spending by Category</div>
+      <canvas id="chart-category" height="220"></canvas>
+    </div>
+
+    <div class="card chart-card">
+      <div class="chart-title">Daily Spend Trend</div>
+      <canvas id="chart-trend" height="180"></canvas>
+    </div>
+
+    <!-- Top Merchants -->
+    <div class="section-header">
+      <span class="section-title">Top Merchants</span>
+    </div>
+    <div id="top-merchants" class="card merchant-list"></div>
+
+    <!-- Optimization Tips -->
+    <div class="section-header">
+      <span class="section-title">Optimization Tips</span>
+    </div>
+    <div id="optimization-tips" class="tips-list"></div>
+
+    <!-- Ask Claude Section -->
+    <div class="card claude-card">
+      <div class="claude-header">
+        <div class="claude-logo">✦</div>
+        <div>
+          <div class="claude-title">Ask Claude AI</div>
+          <div class="claude-sub">Uses your Claude Pro subscription — free, unlimited</div>
+        </div>
+      </div>
+      <div class="claude-prompts">
+        <button class="claude-prompt-btn" onclick="askClaude('where am I wasting money?')">Where am I wasting money?</button>
+        <button class="claude-prompt-btn" onclick="askClaude('how can I save more?')">How can I save more?</button>
+        <button class="claude-prompt-btn" onclick="askClaude('what are my biggest expense trends?')">What are my biggest trends?</button>
+        <button class="claude-prompt-btn" onclick="askClaude('compare my spending to last month')">Compare to last month</button>
+      </div>
+      <div class="claude-custom">
+        <input type="text" id="claude-question" class="form-input" placeholder="Ask anything about your finances..." />
+        <button class="btn btn-claude" id="ask-claude-btn">Ask Claude</button>
+      </div>
+      <div class="claude-info">
+        Tapping "Ask Claude" copies your spending data + question to clipboard, then opens Claude.ai — just paste and send.
+      </div>
+    </div>
+
+    <div class="bottom-spacer"></div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SETTINGS MODAL
+  ═══════════════════════════════════════════════════ -->
+  <div id="settings-modal" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeSettings()"></div>
+    <div class="modal-sheet">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title">Settings</h2>
+
+      <div class="setting-item">
+        <div class="setting-label">Your Name</div>
+        <input type="text" id="setting-name" class="form-input" placeholder="e.g. Deepak" />
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">Currency</div>
+        <select id="setting-currency" class="form-input form-select">
+          <option value="₹">₹ Indian Rupee</option>
+          <option value="$">$ US Dollar</option>
+          <option value="€">€ Euro</option>
+        </select>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">Monthly Budget (₹)</div>
+        <input type="number" id="setting-budget" class="form-input" placeholder="e.g. 50000" inputmode="numeric" />
+      </div>
+
+      <div class="section-header" style="margin-top:16px">
+        <span class="section-title">Apple Shortcuts Setup</span>
+      </div>
+      <div class="shortcuts-guide card">
+        <p class="shortcuts-step"><strong>One-time setup per bank:</strong></p>
+        <ol class="shortcuts-list">
+          <li>Open <strong>Shortcuts</strong> app on iPhone</li>
+          <li>Tap <strong>Automation</strong> → <strong>+</strong> → <strong>Message</strong></li>
+          <li>Set sender to your bank (e.g. <code>HDFCBK</code>)</li>
+          <li>Add action: <strong>Open URL</strong></li>
+          <li>Set URL to: <code id="shortcut-url"></code></li>
+          <li>Enable <strong>"Run Immediately"</strong></li>
+        </ol>
+        <button class="btn btn-secondary" id="copy-shortcut-url">Copy URL Template</button>
+      </div>
+
+      <div class="section-header" style="margin-top:16px">
+        <span class="section-title">Data</span>
+      </div>
+      <button class="btn btn-secondary" id="export-json-btn">Export All Data (JSON)</button>
+      <button class="btn btn-secondary" id="import-json-btn" style="margin-top:8px">Import Data (JSON)</button>
+      <input type="file" id="import-file-input" accept=".json" class="hidden" />
+      <button class="btn btn-danger" id="clear-data-btn" style="margin-top:8px">Clear All Data</button>
+
+      <button class="btn btn-primary" id="save-settings-btn" style="margin-top:20px">Save Settings</button>
+      <div class="bottom-spacer"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       CATEGORY LEARN MODAL
+  ═══════════════════════════════════════════════════ -->
+  <div id="learn-modal" class="modal hidden">
+    <div class="modal-backdrop" onclick="closeLearnModal()"></div>
+    <div class="modal-sheet modal-sheet-sm">
+      <div class="modal-handle"></div>
+      <h2 class="modal-title" id="learn-modal-title">Remember Category?</h2>
+      <p class="modal-body" id="learn-modal-body"></p>
+      <button class="btn btn-primary" id="learn-yes-btn">Yes, always use this category</button>
+      <button class="btn btn-secondary" id="learn-no-btn" style="margin-top:8px">No, just this once</button>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- FAB: Add Button -->
+  <button class="fab" id="fab-add" onclick="navigate('add')" aria-label="Add expense">
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+  </button>
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <button class="nav-btn active" id="nav-home" onclick="navigate('home')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span>Home</span>
+    </button>
+    <button class="nav-btn" id="nav-history" onclick="navigate('history')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      <span>History</span>
+    </button>
+    <div class="nav-fab-space"></div>
+    <button class="nav-btn" id="nav-insights" onclick="navigate('insights')">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span>Insights</span>
+    </button>
+    <button class="nav-btn" id="nav-settings" onclick="openSettings()">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span>Settings</span>
+    </button>
+  </nav>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="categorizer.js"></script>
+  <script src="sms-parser.js"></script>
+  <script src="insights.js"></script>
+  <script src="charts.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
