@@ -315,20 +315,45 @@
         <input type="number" id="setting-budget" class="form-input" placeholder="e.g. 50000" inputmode="numeric" />
       </div>
 
+      <!-- Background SMS Automation -->
+      <div class="section-header" style="margin-top:16px">
+        <span class="section-title">Background Automation</span>
+      </div>
+      <div class="backend-status card" id="backend-status-card">
+        <div class="backend-status-row">
+          <span class="backend-dot" id="backend-dot"></span>
+          <span id="backend-status-text">Not configured</span>
+        </div>
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">Cloudflare Worker URL</div>
+        <input type="url" id="setting-worker-url" class="form-input" placeholder="https://pwa-expense-tracker.YOUR-NAME.workers.dev" />
+      </div>
+
+      <div class="setting-item">
+        <div class="setting-label">API Secret Key</div>
+        <div style="display:flex;gap:8px">
+          <input type="password" id="setting-api-key" class="form-input" placeholder="Your secret key" style="flex:1" />
+          <button type="button" class="btn btn-secondary" id="show-api-key-btn" style="width:auto;padding:0 14px;font-size:13px">Show</button>
+        </div>
+      </div>
+
       <div class="section-header" style="margin-top:16px">
         <span class="section-title">Apple Shortcuts Setup</span>
       </div>
       <div class="shortcuts-guide card">
-        <p class="shortcuts-step"><strong>One-time setup per bank:</strong></p>
+        <p class="shortcuts-step"><strong>After deploying the worker, set up one Shortcut per bank:</strong></p>
         <ol class="shortcuts-list">
-          <li>Open <strong>Shortcuts</strong> app on iPhone</li>
-          <li>Tap <strong>Automation</strong> → <strong>+</strong> → <strong>Message</strong></li>
+          <li>Open <strong>Shortcuts</strong> app → <strong>Automation</strong> → <strong>+</strong></li>
+          <li>Choose <strong>Personal Automation</strong> → <strong>Message</strong></li>
           <li>Set sender to your bank (e.g. <code>HDFCBK</code>)</li>
-          <li>Add action: <strong>Open URL</strong></li>
-          <li>Set URL to: <code id="shortcut-url"></code></li>
-          <li>Enable <strong>"Run Immediately"</strong></li>
+          <li>Turn off <strong>"Ask Before Running"</strong></li>
+          <li>Add action: <strong>Get Contents of URL</strong></li>
+          <li>Set Method to <strong>POST</strong>, URL to: <code id="shortcut-url"></code></li>
+          <li>Add Request Body: JSON → Key: <code>sms</code> → Value: <strong>Shortcut Input</strong> (blue token)</li>
         </ol>
-        <button class="btn btn-secondary" id="copy-shortcut-url">Copy URL Template</button>
+        <button class="btn btn-secondary" id="copy-shortcut-url">Copy Worker SMS URL</button>
       </div>
 
       <div class="section-header" style="margin-top:16px">
@@ -360,6 +385,9 @@
 
   <!-- TOAST NOTIFICATION -->
   <div id="toast" class="toast hidden"></div>
+
+  <!-- SYNC BADGE — briefly visible after background sync -->
+  <div id="sync-badge" class="sync-badge hidden">↻ Synced</div>
 
   <!-- FAB: Add Button -->
   <button class="fab" id="fab-add" onclick="navigate('add')" aria-label="Add expense">

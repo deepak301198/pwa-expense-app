@@ -1,0 +1,11 @@
+name = "pwa-expense-tracker"
+main = "index.js"
+compatibility_date = "2024-09-23"
+
+# KV namespace — run this first to create it:
+# wrangler kv namespace create EXPENSES_KV
+# Then paste the returned id below
+
+[[kv_namespaces]]
+binding = "EXPENSES_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"

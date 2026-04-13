@@ -2,6 +2,87 @@
 // Manages: data storage, screen navigation, form handling, SMS parsing UI
 
 // ═══════════════════════════════════════════════════
+// BACKEND SYNC
+// When a worker URL + API key are configured, the app syncs
+// with Cloudflare KV so background Shortcuts data appears automatically.
+// ═══════════════════════════════════════════════════
+
+function getWorkerURL() {
+  return getSettings().workerUrl || '';
+}
+
+function getAPIKey() {
+  return getSettings().apiKey || '';
+}
+
+function isBackendConfigured() {
+  return getWorkerURL() && getAPIKey();
+}
+
+// Fetch all entries from backend, merge with local, deduplicate
+async function syncFromBackend() {
+  if (!isBackendConfigured()) return;
+  try {
+    const url = `${getWorkerURL()}/entries?key=${encodeURIComponent(getAPIKey())}`;
+    const res = await fetch(url);
+    if (!res.ok) return;
+    const data = await res.json();
+    const remoteEntries = data.entries || [];
+
+    if (remoteEntries.length === 0) return;
+
+    // Merge remote + local, deduplicate by id, sort newest first
+    const local = getEntries();
+    const all = [...remoteEntries, ...local];
+    const seen = new Set();
+    const merged = all.filter(e => {
+      const key = String(e.id);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+    merged.sort((a, b) => new Date(b.date) - new Date(a.date));
+    saveEntries(merged);
+  } catch {
+    // Silently fail — app works offline without backend
+  }
+}
+
+// Push one entry to backend (fire-and-forget)
+async function pushEntryToBackend(entry) {
+  if (!isBackendConfigured()) return;
+  try {
+    await fetch(`${getWorkerURL()}/entries?key=${encodeURIComponent(getAPIKey())}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(entry)
+    });
+  } catch {
+    // Silently fail — entry already saved locally
+  }
+}
+
+// Delete from backend (fire-and-forget)
+async function deleteEntryFromBackend(id) {
+  if (!isBackendConfigured()) return;
+  try {
+    await fetch(`${getWorkerURL()}/entries/${encodeURIComponent(id)}?key=${encodeURIComponent(getAPIKey())}`, {
+      method: 'DELETE'
+    });
+  } catch {}
+}
+
+// Test backend connection
+async function testBackendConnection(workerUrl, apiKey) {
+  try {
+    const res = await fetch(`${workerUrl}/ping?key=${encodeURIComponent(apiKey)}`);
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+// ═══════════════════════════════════════════════════
 // STORAGE
 // ═══════════════════════════════════════════════════
 
@@ -32,12 +113,14 @@ function addEntry(entry) {
   entry.id = Date.now() + Math.random();
   entries.unshift(entry); // newest first
   saveEntries(entries);
+  pushEntryToBackend(entry); // sync to backend (background, won't block UI)
   return entry;
 }
 
 function deleteEntry(id) {
-  const entries = getEntries().filter(e => e.id !== id);
+  const entries = getEntries().filter(e => String(e.id) !== String(id));
   saveEntries(entries);
+  deleteEntryFromBackend(id); // sync deletion to backend
 }
 
 // ═══════════════════════════════════════════════════
@@ -511,25 +594,60 @@ function openSettings() {
   document.getElementById('setting-name').value = settings.name || '';
   document.getElementById('setting-currency').value = settings.currency || '₹';
   document.getElementById('setting-budget').value = settings.budget || '';
+  document.getElementById('setting-worker-url').value = settings.workerUrl || '';
+  document.getElementById('setting-api-key').value = settings.apiKey || '';
 
-  // Build shortcut URL
-  const baseUrl = window.location.href.split('?')[0];
-  const shortcutUrl = `${baseUrl}?sms=[Shortcut Input]`;
-  document.getElementById('shortcut-url').textContent = shortcutUrl;
+  // Show backend connection status
+  const dot = document.getElementById('backend-dot');
+  const statusText = document.getElementById('backend-status-text');
+  if (settings.workerUrl && settings.apiKey) {
+    dot.className = 'backend-dot connected';
+    statusText.textContent = 'Background sync active — SMS auto-saved silently';
+  } else {
+    dot.className = 'backend-dot';
+    statusText.textContent = 'Not configured — set Worker URL + API key below';
+  }
+
+  // Build Shortcut SMS URL using worker URL
+  const workerUrl = settings.workerUrl || 'https://YOUR-WORKER.workers.dev';
+  const apiKey = settings.apiKey || 'YOUR-API-KEY';
+  document.getElementById('shortcut-url').textContent =
+    `${workerUrl}/sms?key=${apiKey}`;
 
   document.getElementById('settings-modal').classList.remove('hidden');
 }
+
+// Show / hide API key
+document.getElementById('show-api-key-btn').addEventListener('click', function () {
+  const input = document.getElementById('setting-api-key');
+  const isHidden = input.type === 'password';
+  input.type = isHidden ? 'text' : 'password';
+  this.textContent = isHidden ? 'Hide' : 'Show';
+});
 
 function closeSettings() {
   document.getElementById('settings-modal').classList.add('hidden');
 }
 
-document.getElementById('save-settings-btn').addEventListener('click', function () {
+document.getElementById('save-settings-btn').addEventListener('click', async function () {
   const settings = {
     name: document.getElementById('setting-name').value.trim(),
     currency: document.getElementById('setting-currency').value,
-    budget: parseFloat(document.getElementById('setting-budget').value) || 0
+    budget: parseFloat(document.getElementById('setting-budget').value) || 0,
+    workerUrl: document.getElementById('setting-worker-url').value.trim().replace(/\/$/, ''),
+    apiKey: document.getElementById('setting-api-key').value.trim(),
   };
+
+  // Test connection if backend details provided
+  if (settings.workerUrl && settings.apiKey) {
+    showToast('Testing connection...');
+    const ok = await testBackendConnection(settings.workerUrl, settings.apiKey);
+    if (!ok) {
+      showToast('⚠️ Could not connect — check URL and key');
+      return;
+    }
+  }
+
   saveSettings(settings);
   closeSettings();
   showToast('Settings saved ✓');
@@ -678,6 +796,15 @@ function populateBankFilter(entries) {
 // TOAST
 // ═══════════════════════════════════════════════════
 
+function showSyncBadge() {
+  // Small indicator that backend sync happened
+  const el = document.getElementById('sync-badge');
+  if (el) {
+    el.classList.remove('hidden');
+    setTimeout(() => el.classList.add('hidden'), 3000);
+  }
+}
+
 let toastTimer = null;
 
 function showToast(message) {
@@ -724,7 +851,14 @@ if ('serviceWorker' in navigator) {
 // INIT
 // ═══════════════════════════════════════════════════
 
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', async function () {
   handleURLParams();
-  renderHome();
+  renderHome(); // show local data immediately
+
+  // Pull background SMS entries from Cloudflare, then refresh
+  if (isBackendConfigured()) {
+    await syncFromBackend();
+    renderHome(); // re-render with any new Shortcut entries
+    showSyncBadge();
+  }
 });
