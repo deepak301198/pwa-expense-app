@@ -54,24 +54,39 @@ function parseHDFC(text) {
   const lower = text.toLowerCase();
   if (!lower.includes('hdfc')) return null;
 
-  // "INR 850.00 debited from A/c XX1234 on 13-04-26 at Zomato. Avl bal..."
-  // "Rs.850 credited to HDFC Bank A/c XXXXXX1234 on 13-04-26"
-  // "HDFC Bank: Rs 850.00 debited from A/c **1234 on 13-Apr-26. Info: UPI-Zomato"
+  // Format 1: "INR 850.00 debited from A/c XX1234 on 13-04-26 at Zomato"
+  // Format 2: "Rs.850 credited to HDFC Bank A/c XX1234 on 13-04-26"
+  // Format 3 (new): "Sent Rs.60.00\nFrom HDFC Bank A/C *9366\nTo T NANDESH\nOn 14/04/26"
+  // Format 4 (new): "Credit Alert!\nRs.1.00 credited to HDFC Bank A/c XX9366 on 14-04-26 from VPA 8141747801@upi"
 
   const amountMatch = text.match(/(?:INR|Rs\.?|₹)\s*([\d,]+(?:\.\d{1,2})?)/i);
   if (!amountMatch) return null;
 
   const amount = parseAmount(amountMatch[1]);
-  const type = /debit|dr\b/i.test(text) ? 'debit' : /credit|cr\b/i.test(text) ? 'credit' : null;
+
+  // "Sent" = debit (money left your account), "Credit Alert" = credit
+  const isDebit  = /\b(debit|debited|dr\b|sent)\b/i.test(text);
+  const isCredit = /\b(credit|credited|cr\b|credit alert)\b/i.test(text);
+  const type = isDebit ? 'debit' : isCredit ? 'credit' : null;
   if (!type) return null;
 
-  const accountMatch = text.match(/[Aa]\/[Cc]\s*[X*]{2,}(\d{3,4})|[Aa]cct?\s*[X*]{2,}(\d{3,4})/);
+  // Handle both A/c XX1234 and A/C *9366 formats
+  const accountMatch = text.match(/[Aa]\/[Cc]\s*[X*]{1,}(\d{3,4})|[Aa]cct?\s*[X*]{1,}(\d{3,4})/);
   const account_last4 = accountMatch ? (accountMatch[1] || accountMatch[2]) : null;
 
   const dateMatch = text.match(/(\d{1,2}[-\/]\d{1,2}[-\/]\d{2,4}|\d{1,2}[-\s][A-Za-z]{3}[-\s]\d{2,4})/);
 
-  // Merchant from UPI ref or "at Merchant" or "Info: Merchant"
-  let merchant = extractMerchant(text);
+  // For "Sent" format, merchant is the recipient after "To "
+  let merchant = '';
+  const toMatch = text.match(/^To\s+(.+)$/im);
+  if (toMatch) {
+    merchant = toMatch[1].trim();
+  } else {
+    // For UPI credit, extract VPA/merchant
+    const vpaMatch = text.match(/from\s+VPA\s+([^\s(]+)/i);
+    if (vpaMatch) merchant = vpaMatch[1].trim();
+    else merchant = extractMerchant(text);
+  }
 
   return { amount, type, merchant, bank: 'HDFC', account_last4, dateRaw: dateMatch?.[1] };
 }

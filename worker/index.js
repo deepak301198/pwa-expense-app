@@ -181,8 +181,19 @@ function parseSMS(text) {
 
   // Merchant extraction
   let merchant = '';
+
+  // HDFC "Sent" format: "To T NANDESH" on its own line
+  const toMatch = text.match(/^To\s+(.+)$/im);
+  if (toMatch) merchant = toMatch[1].trim();
+
+  // UPI credit: "from VPA 8141747801@upi"
+  if (!merchant) {
+    const vpaMatch = text.match(/from\s+VPA\s+([^\s(]+)/i);
+    if (vpaMatch) merchant = vpaMatch[1].trim();
+  }
+
   const upiRef = text.match(/UPI[\/\-@\s]+([A-Za-z0-9\s]+?)(?:\/|\s+[A-Z]{2,}|\s+[Rr]ef|\s+[Oo]n\s|$)/);
-  if (upiRef) merchant = upiRef[1].trim();
+  if (!merchant && upiRef) merchant = upiRef[1].trim();
 
   if (!merchant) {
     const atPat = text.match(/\bat\s+([A-Za-z0-9\s\.]+?)(?:\s+on\s|\s+Avl|\s+Bal|[\.,]|$)/i);
